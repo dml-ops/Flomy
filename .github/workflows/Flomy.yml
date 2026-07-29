@@ -1,0 +1,11 @@
+name: Flomy
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Say Hello to Flomy
+      run: echo "Welcome everybody to Flomy"
