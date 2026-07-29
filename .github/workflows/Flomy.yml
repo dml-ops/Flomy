@@ -8,4 +8,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Say Hello to Flomy
-      run: echo "Welcome everybody to Flomy"
+      run: |
+        echo "Welcome everybody to Flomy"
+        echo "Starting CI pipeline..."
+        echo "Current directory:"
+        pwd
+        echo "Listing files:"
+        ls -la
