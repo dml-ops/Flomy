@@ -44,7 +44,7 @@ jobs:
           terraform plan \
             -var="subscription_id=${{ secrets.DML_AZURE_SUB_ID }}" \
             -var="resource_group_name=oyster-rg" \
-            -var="location=southafricannorth" \
+            -var="location=southafricanorth" \
             -var="vnet_name=oyster-vnet" \
             -var="vnet_address_space=[\"10.0.0.0/16\"]" \
             -var="subnet_name=oyster-subnet" \
