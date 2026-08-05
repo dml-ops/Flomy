@@ -24,10 +24,6 @@ resource "azurerm_resource_group" "oyster-rg" {
   location = var.location
 }
 
-resource "azurerm_resource_group" "Moon" {
-  name     = "Moon"
-  location = "South Africa North"
-}
 
 module "network" {
   source = "./modules/network"
