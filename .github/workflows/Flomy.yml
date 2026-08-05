@@ -53,7 +53,7 @@ jobs:
             -var="nsg_name=oyster-nsg" \
             -var="nic_name=oyster-nic" \
             -var="vm_name=oyster-vm" \
-            -var="vm_size=Standard_B1ms" \
+            -var="vm_size=Standard_B2ts_v2" \
             -var="admin_username=azureuser" \
             -var="ssh_public_key_path=~/.ssh/id_rsa.pub" \
             -out=dml.tfplan
