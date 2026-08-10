@@ -10,13 +10,11 @@ variable "resource_group_name" {
   default     = "oyster-rg"
 }
 
-
 variable "location" {
   description = "Azure region for all resources"
   type        = string
   default     = "South Africa North"
 }
-
 
 variable "vnet_name" {
   description = "Name of the virtual network"

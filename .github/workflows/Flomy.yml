@@ -1,0 +1,114 @@
+# Workflow name — shown in the GitHub Actions tab
+name: Flomy VM Deploy
+
+# Triggers: run automatically on push to main, OR manually via the Actions tab
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+
+  # JOB 1: Provision the VM with Terraform
+  provision:
+    runs-on: ubuntu-latest
+    environment: Flomy-production
+
+    # Exposes the VM's IP to the "configure" job below
+    outputs:
+      vm_ip: ${{ steps.tf_outputs.outputs.vm_public_ip }}
+
+    steps:
+      # Pull repo code (including .tf files) onto the runner
+      - uses: actions/checkout@v4
+
+      # Authenticate to Azure using the service principal JSON secret
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.DML_AZURE_CREDENTIALS }}
+
+      # Install the Terraform CLI
+      - uses: hashicorp/setup-terraform@v3
+
+      # Write the public SSH key to disk so Terraform can inject it into the VM
+      - name: Prepare SSH public key for Terraform
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DML_SSH_PUBLIC_KEYS }}" > ~/.ssh/id_rsa.pub
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="subscription_id=${{ secrets.DML_AZURE_SUB_ID }}" \
+            -var="resource_group_name=oyster-rg" \
+            -var="location=southafricanorth" \
+            -var="vnet_name=oyster-vnet" \
+            -var="vnet_address_space=[\"10.0.0.0/16\"]" \
+            -var="subnet_name=oyster-subnet" \
+            -var="subnet_address_prefix=[\"10.0.1.0/24\"]" \
+            -var="public_ip_name=oyster-pip" \
+            -var="nsg_name=oyster-nsg" \
+            -var="nic_name=oyster-nic" \
+            -var="vm_name=oyster-vm" \
+            -var="vm_size=Standard_B2ts_v2" \
+            -var="admin_username=azureuser" \
+            -var="ssh_public_key_path=~/.ssh/id_rsa.pub" \
+            -out=dml.tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve dml.tfplan
+
+      # Read the VM's public IP out of Terraform state and publish it as a
+      # step output (picked up by the job-level "outputs:" above)
+      - name: Get Terraform Outputs
+        id: tf_outputs
+        run: echo "vm_public_ip=$(terraform output -raw vm_public_ip)" >> "$GITHUB_OUTPUT"
+
+  # JOB 2: Configure the VM over SSH once it's provisioned
+  configure:
+    needs: provision         # waits for "provision" to finish, and can read its outputs
+    runs-on: ubuntu-latest
+
+    steps:
+      # Write the private key to disk so we can SSH into the new VM
+      - name: Prepare SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DML_SSH_PRIVATE_KEYS }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      # VMs take a little while to finish booting/accepting SSH connections
+      # after Terraform reports them as "created" — poll until it responds
+
+      - name: Wait for SSH
+        run: |
+          for i in $(seq 1 10); do
+            ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+              azureuser@${{ needs.provision.outputs.vm_ip }} echo ready && break
+            echo "VM not ready yet, waiting 15 seconds..."
+            sleep 15
+          done
+
+      # SSH in and run the actual server setup: install nginx, pull the site
+      # from GitHub, drop it in place, restart nginx to serve it
+
+      - name: Install and configure site
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            azureuser@${{ needs.provision.outputs.vm_ip }} '
+              sudo apt update && sudo apt upgrade -y
+              sudo apt install nginx -y
+              cd /var/www/html
+              sudo rm -rf index.nginx-debian.html
+              sudo git clone https://github.com/dml-ops/sweet_bakery.git .
+              sudo systemctl restart nginx
+            '
+
+      # Write a friendly confirmation to the workflow's summary page
+      - name: Show us the site is live
+        run: echo "SweetBakery site is live!" >> "$GITHUB_STEP_SUMMARY"
+
+
