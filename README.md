@@ -153,7 +153,7 @@ The automated workflow defined in the project streamlines the software release l
 
 
 
-[Insert Image Placeholder Here]
+
 ![Project Dashboard Architecture](./assets/Screenshot-2026-08-10-173545.png) 
 ---
 
